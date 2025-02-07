@@ -49,10 +49,13 @@ def merge_output_with_coordinates(output_path, coordinates_path, output_final_pa
     output_df.to_csv(output_final_path, index=False)
     print(f"Merged file saved to: {output_final_path}")
 
-def extract_image_id(image_path):
+def extract_image_ids(image_path):
     filename = os.path.basename(image_path)
-    m = re.search(r'(\d+)', filename)
-    return m.group(1)
+    numbers = re.findall(r'(\d+)', filename)
+    if len(numbers) >= 2:
+        return numbers[0], numbers[1]  # sub_id, group_id
+    else:
+        return numbers[0], None
 
 class StreetViewDataset(Dataset):
     def __init__(self, image_paths, color_mapping, macro_mapping, processor):
@@ -121,28 +124,32 @@ def process_batch(model, batch, color_mapping, macro_mapping, device, processor)
 def update_csv_data(image_paths, blended_images, pixel_distributions, output_folder, csv_data):
     for image_path, blended_image, pixel_distribution in zip(image_paths, blended_images, pixel_distributions):
         angle_dir = os.path.basename(os.path.dirname(image_path))
-
-        angle_output_folder = output_folder / angle_dir
-        angle_output_folder.mkdir(parents=True, exist_ok=True)
- 
-        output_path = angle_output_folder / os.path.basename(image_path)
+        angle_output_folder = os.path.join(output_folder, angle_dir)
+        os.makedirs(angle_output_folder, exist_ok=True)
+        output_path = os.path.join(angle_output_folder, os.path.basename(image_path))
         blended_image.save(output_path)
         
-        image_id = extract_image_id(image_path)
-        if image_id not in csv_data:
-            csv_data[image_id] = {
-                "image_id": image_id,
+        # Extract both the sub_id and the group_id.
+        sub_id, group_id = extract_image_ids(image_path)
+        # Build a composite key to uniquely identify each image instance.
+        composite_key = f"{sub_id}_{group_id}"
+        
+        if composite_key not in csv_data:
+            csv_data[composite_key] = {
+                "image_id": group_id,
+                "sub_id": sub_id,
                 "path_0": None,
                 "path_90": None,
                 "path_180": None,
                 "path_360": None,
                 "pixel_distribution": {}
             }
-        csv_data[image_id][f"path_{angle_dir}"] = output_path
+            
+        csv_data[composite_key][f"path_{angle_dir}"] = output_path
         
+        # Update the pixel distribution.
         for key, count in pixel_distribution.items():
-            csv_data[image_id]["pixel_distribution"][key] = csv_data[image_id]["pixel_distribution"].get(key, 0) + count
-
+            csv_data[composite_key]["pixel_distribution"][key] = csv_data[composite_key]["pixel_distribution"].get(key, 0) + count
 
 @app.command()
 def main(
@@ -150,7 +157,7 @@ def main(
     image_path: Path = PROCESSED_DATA_DIR / "street_view_images",
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    angle_dirs = ['0', '90', '180', '360']
+    angle_dirs = ['0', '90', '180', '270']
 
     if image_path.exists():
         output_folder = image_path / 'masked_output'
