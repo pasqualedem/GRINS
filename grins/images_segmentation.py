@@ -17,37 +17,45 @@ from grins.config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR
 
 app = typer.Typer()
 
-def merge_output_with_coordinates(output_path, coordinates_path, output_final_path):
-    output_df = pd.read_csv(output_path)
-    coordinates_df = pd.read_csv(coordinates_path)
-    
-    output_df['image_id'] = output_df['image_id'].astype(int)
-    coordinates_df['ID'] = coordinates_df['ID'].astype(int)
-    
-    def extract_first_id(path):
-        match = re.search(r'(\d+)_', str(path))
-        return int(match.group(1)) if match else None
-    
-    output_df['first_id'] = output_df['path_0'].apply(extract_first_id)
-    
-    output_df.sort_values(by=['image_id', 'first_id'], inplace=True)
+def merge_output_with_coordinates(output_file_path, coordinates_file_path, final_csv_path):
+    """
+    Merges output.csv and merged_coordinates.csv based on ID and sub_id, ensuring 
+    only matching IDs are retained and aligned correctly.
+
+    Parameters:
+    output_file_path (str): Path to the output CSV file.
+    coordinates_file_path (str): Path to the coordinates CSV file.
+    final_csv_path (str): Path to save the final merged CSV.
+
+    Returns:
+    str: Path to the final saved CSV file.
+    """
+    # Load the files
+    output_df = pd.read_csv(output_file_path)
+    coordinates_df = pd.read_csv(coordinates_file_path)
+
+    # Rename 'image_id' to 'ID' for consistency
+    output_df.rename(columns={"image_id": "ID"}, inplace=True)
+
+    # Remove IDs from coordinates_df that are not in output_df
+    coordinates_df = coordinates_df[coordinates_df["ID"].isin(output_df["ID"])].copy()
+
+    # Sort both DataFrames by ID and sub_id to match corresponding rows correctly
+    output_df.sort_values(by=["ID", "sub_id"], inplace=True)
+    coordinates_df.sort_values(by="ID", inplace=True)
+
+    # Reset index after sorting
     output_df.reset_index(drop=True, inplace=True)
-    
-    coordinates_df.sort_values(by=['ID'], inplace=True)
     coordinates_df.reset_index(drop=True, inplace=True)
-      
-    output_df['lon'] = coordinates_df['lon']
-    output_df['lat'] = coordinates_df['lat']
-    
-    output_df.drop('first_id', axis=1, inplace=True)
-    
-    cols = list(output_df.columns)
-    cols.insert(cols.index('path_0'), cols.pop(cols.index('lon')))
-    cols.insert(cols.index('path_0'), cols.pop(cols.index('lat')))
-    output_df = output_df.reindex(columns=cols)
-    
-    output_df.to_csv(output_final_path, index=False)
-    print(f"Merged file saved to: {output_final_path}")
+
+    # Merge the data while ensuring correct alignment based on sorted order
+    merged_df = output_df.copy()
+    merged_df[["lon", "lat"]] = coordinates_df[["lon", "lat"]]
+
+    # Save the final CSV
+    merged_df.to_csv(final_csv_path, index=False)
+
+    logger.info(f"Final CSV saved as: {final_csv_path}")
 
 def extract_image_ids(image_path):
     filename = os.path.basename(image_path)
@@ -141,7 +149,7 @@ def update_csv_data(image_paths, blended_images, pixel_distributions, output_fol
                 "path_0": None,
                 "path_90": None,
                 "path_180": None,
-                "path_360": None,
+                "path_270": None,
                 "pixel_distribution": {}
             }
             
