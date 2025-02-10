@@ -45,13 +45,7 @@ def download_images(lat, lon, image_path, filename_prefix):
     headings = [0, 90, 180, 270]
 
     with ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(download_images_for_heading, lat, lon, heading, image_path, filename_prefix)
-            for heading in headings
-        ]
-
-        for future in futures:
-            future.result()
+        executor.map(lambda heading: download_images_for_heading(lat, lon, heading, image_path, filename_prefix), headings)
 
 def process_csv_and_download_images(csv_file_path, image_path):
     logger.info(f"Processing CSV file: {csv_file_path}...")
