@@ -20,4 +20,4 @@ MODELS_DIR = PROJ_ROOT / "models"
 
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
-API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("STREET_VIEW_API_KEY")
