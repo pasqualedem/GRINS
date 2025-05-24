@@ -11,7 +11,7 @@ import os
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
 
-from grins.config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, API_KEY
+from grins.config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, API_KEY,CITY1,CITY2
 
 app = typer.Typer()
 
@@ -95,10 +95,10 @@ def process_csv_and_download_images(csv_file_path, image_path):
     with open(csv_file_path, mode="r") as csvfile:
         reader = csv.DictReader(csvfile)
         for i, row in tqdm(enumerate(reader), desc="Processing rows"):
-            lat = row["lat"]
-            lon = row["lon"]
-            unique_id = row["ID"]
-            filename_prefix = f"image_{i}_{unique_id}"
+            lat = row['lat']
+            lon = row['lon']
+            unique_id = row['ID']
+            filename_prefix = f'image_{i}_{unique_id}'
 
             download_images(lat, lon, image_path, filename_prefix)
 
@@ -135,9 +135,9 @@ def check_and_delete_images(directory_path, target_intensity=227, target_count=2
 
 
 @app.command()
-def main(
-    csv_file_path: Path = EXTERNAL_DATA_DIR / "coordinates_Manhattan_NYC.csv",
-    image_path: Path = PROCESSED_DATA_DIR / "street_view_images_Manhattan_NYC",
+
+def main(csv_file_path: Path = EXTERNAL_DATA_DIR / "merged_coordinates.csv",
+image_path: Path = PROCESSED_DATA_DIR / "street_view_images",
 ):
     image_path.mkdir(parents=True, exist_ok=True)
 
