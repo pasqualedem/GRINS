@@ -23,4 +23,3 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 API_KEY = os.getenv("API_KEY")
 CITY1=os.getenv("CITY1")
 CITY2=os.getenv("CITY2")
-
