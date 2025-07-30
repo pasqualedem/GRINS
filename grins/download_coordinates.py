@@ -4,6 +4,9 @@ from shapely.geometry import LineString, Point
 from pathlib import Path
 from .config import EXTERNAL_DATA_DIR
 
+# set seed for reproducibility
+random.seed(42)
+
 
 def get_random_points_on_edges(location: str, n: int):
     """
@@ -66,4 +69,4 @@ def get_points_csv(location: str, n: int):
             f.write(f"{i},{lon},{lat}\n")
 
 
-get_points_csv("Manhattan, NYC", 100)
+get_points_csv("Manhattan, NYC, USA", 1000)

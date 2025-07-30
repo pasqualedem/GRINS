@@ -136,8 +136,8 @@ def check_and_delete_images(directory_path, target_intensity=227, target_count=2
 
 @app.command()
 def main(
-    csv_file_path: Path = EXTERNAL_DATA_DIR / "coordinates_Manhattan_NYC.csv",
-    image_path: Path = PROCESSED_DATA_DIR / "street_view_images_Manhattan_NYC",
+    csv_file_path: Path = EXTERNAL_DATA_DIR / "coordinates_Manhattan_NYC_USA.csv",
+    image_path: Path = PROCESSED_DATA_DIR / "street_view_images_Manhattan_NYC_USA",
 ):
     image_path.mkdir(parents=True, exist_ok=True)
 
