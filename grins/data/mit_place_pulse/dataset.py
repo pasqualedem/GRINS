@@ -33,14 +33,18 @@ class MITPlacePulseDataset(Dataset):
             transform (callable, optional): Optional transform to be applied on a sample.
         """
         self.data_dir = Path(data_dir)
-        self.images_dir = self.data_dir / "gsv" / "final_photo_dataset"
-        self.df = pd.read_csv(self.data_dir / "df.csv")
-        
+        self.question = question
+        self.seed = seed
+        self.split = split
+        self.split_ratio = split_ratio
         if transform is not None:
             self.transform = transform
         else:
             self.transform = transforms.ToTensor()
-
+        
+        self.images_dir = self.data_dir / "gsv" / "final_photo_dataset"
+        self.df = pd.read_csv(self.data_dir / "df.csv")
+        
         # get the required split
         train_ratio, val_ratio, test_ratio = split_ratio
         assert (
@@ -120,3 +124,5 @@ class MITPlacePulseDataset(Dataset):
             'image1_names': image1_names,
             'questions': questions
         }
+
+
