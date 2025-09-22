@@ -90,7 +90,7 @@ def train(config_path: Path | str):
     # Accelerate!
     project_config = ProjectConfiguration(
         project_dir=config.project_dir,
-        logging_dir=Path(config.project_dir) / config_path.stem,
+        logging_dir=config.project_dir,
         automatic_checkpoint_naming=True
     )
     accelerator: Accelerator = config.accelerator_partial(project_config=project_config)

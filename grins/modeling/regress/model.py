@@ -40,7 +40,7 @@ class TaskWeightedPairwiseRankingLoss(nn.Module):
 
         # Compute per-sample hinge loss
         per_sample_loss = torch.clamp(
-            -y
+            y
             * (
                 scores0.gather(1, task_idxs.unsqueeze(-1)).squeeze(-1)
                 - scores1.gather(1, task_idxs.unsqueeze(-1)).squeeze(-1)
@@ -48,9 +48,9 @@ class TaskWeightedPairwiseRankingLoss(nn.Module):
             min=0.0,
         )  # [B]
 
+        loss_per_task = []
         if self.use_task_weighting:
             # Compute loss **per task**
-            loss_per_task = []
             for t in range(self.num_tasks):
                 mask = task_idxs == t
                 if mask.any():
