@@ -60,10 +60,11 @@ optimizer_partial:
   _partial_: True
 scheduler_name: constant_with_warmup
 
+project_dir: &project_dir models/regress
 accelerator_partial:
   _target_: accelerate.Accelerator
   _partial_: true
-  project_dir: models/regress
+  project_dir: *project_dir
   log_with: wandb
 init_trackers_params:
   project_name: GRINS

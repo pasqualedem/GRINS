@@ -71,8 +71,6 @@ class MITPlacePulseDataset(Dataset):
             self.data = self.data[self.data["study_question"] == question].reset_index(drop=True)
 
     def __len__(self):
-        if self.split == "train":
-            return 16
         return len(self.data)
 
     def __getitem__(self, idx):

@@ -20,6 +20,26 @@ def remove_rows_with_missing_images(data_dir: Path):
     cleaned_df.to_csv(data_dir / "df.csv", index=False)
 
 
+def remove_rows_with_missing_study_question(data_dir: Path):
+    data_dir = Path(data_dir)
+    df = pd.read_csv(data_dir / "df.csv")
+
+    # Drop rows where study_question is NaN
+    cleaned_df = df.dropna(subset=["study_question"])
+
+    cleaned_df.to_csv(data_dir / "df.csv", index=False)
+
+
+def keep_only_left_right_choices(data_dir: Path):
+    data_dir = Path(data_dir)
+    df = pd.read_csv(data_dir / "df.csv")
+
+    # Keep only rows where choice is "left" or "right"
+    cleaned_df = df[df["choice"].isin(["left", "right"])]
+
+    cleaned_df.to_csv(data_dir / "df.csv", index=False)
+
+
 class RemoveWatermark(Transform):
     def __init__(self, height: int = 277):
         super().__init__()
@@ -33,4 +53,6 @@ class RemoveWatermark(Transform):
 
 
 if __name__ == "__main__":
-    remove_rows_with_missing_images(EXTERNAL_DATA_DIR / "mit-place-pulse")
+    # remove_rows_with_missing_images(EXTERNAL_DATA_DIR / "mit-place-pulse")
+    # remove_rows_with_missing_study_question(EXTERNAL_DATA_DIR / "mit-place-pulse")
+    keep_only_left_right_choices((EXTERNAL_DATA_DIR / "mit-place-pulse"))

@@ -89,8 +89,8 @@ def train(config_path: Path | str):
 
     # Accelerate!
     project_config = ProjectConfiguration(
-        project_dir=config.accelerator_partial.project_dir,
-        logging_dir=Path(config.accelerator_partial.project_dir) / config_path.stem,
+        project_dir=config.project_dir,
+        logging_dir=Path(config.project_dir) / config_path.stem,
         automatic_checkpoint_naming=True
     )
     accelerator: Accelerator = config.accelerator_partial(project_config=project_config)
@@ -178,6 +178,7 @@ def train(config_path: Path | str):
             log_dict = {
                 "train/batch_loss": loss.item(),
                 "train/avg_loss": train_avg_loss,
+                "train/lr": current_lr,
                 "train/step": train_step,
             }
             log_dict = log_dict | log_loss_per_task | log_weights
