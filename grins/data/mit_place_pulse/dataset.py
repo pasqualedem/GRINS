@@ -22,6 +22,7 @@ class MITPlacePulseDataset(Dataset):
         split="train",
         split_ratio=[0.65, 0.05, 0.30],
         transform=None,
+        processor=None,
     ):
         """
         Args:
@@ -31,6 +32,7 @@ class MITPlacePulseDataset(Dataset):
             split (str): One of 'train', 'val', or 'test' to specify the dataset split.
             split_ratio (list): List of three floats specifying the train, val, test split ratios.
             transform (callable, optional): Optional transform to be applied on a sample.
+            processor (AutoImageProcessor, optional): An image processor from HF that might be applied in the collate_fn.
         """
         self.data_dir = Path(data_dir)
         self.question = question
@@ -41,6 +43,7 @@ class MITPlacePulseDataset(Dataset):
             self.transform = transform
         else:
             self.transform = transforms.ToTensor()
+        self.processor = processor
         
         self.images_dir = self.data_dir / "gsv" / "final_photo_dataset"
         self.df = pd.read_csv(self.data_dir / "df.csv")
@@ -68,6 +71,8 @@ class MITPlacePulseDataset(Dataset):
             self.data = self.data[self.data["study_question"] == question].reset_index(drop=True)
 
     def __len__(self):
+        if self.split == "train":
+            return 16
         return len(self.data)
 
     def __getitem__(self, idx):
@@ -107,10 +112,14 @@ class MITPlacePulseDataset(Dataset):
         }
         return sample
     
-    @staticmethod
-    def collate_fn(batch):
+    def collate_fn(self, batch):
         images0 = torch.stack([item['image0'] for item in batch])
         images1 = torch.stack([item['image1'] for item in batch])
+        
+        if self.processor is not None:
+            images0 = self.processor(images0, return_tensors="pt")["pixel_values"]
+            images1 = self.processor(images1, return_tensors="pt")["pixel_values"]
+        
         labels = torch.tensor([item['label'] for item in batch])
         image0_names = [item['image0_name'] for item in batch]
         image1_names = [item['image1_name'] for item in batch]

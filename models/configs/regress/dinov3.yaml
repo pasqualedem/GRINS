@@ -7,7 +7,7 @@ tasks:
   - safer
   - wealthier
 processor:
-  _target_: transformers.AutoProcessor.from_pretrained
+  _target_: transformers.AutoImageProcessor.from_pretrained
   pretrained_model_name_or_path: &pretrained_model_name_or_path facebook/dinov3-vitb16-pretrain-lvd1689m
   do_resize: false
 backbone:
@@ -60,8 +60,12 @@ optimizer_partial:
   _partial_: True
 scheduler_name: constant_with_warmup
 
-accelerator:
+accelerator_partial:
   _target_: accelerate.Accelerator
+  _partial_: true
   project_dir: models/regress
+  log_with: wandb
+init_trackers_params:
+  project_name: GRINS
 num_epochs: 10
 warmup_ratio: 0.2
