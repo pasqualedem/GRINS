@@ -111,9 +111,10 @@ class DINOv3Linear(nn.Module):
             raise ValueError("Backbone model does not have 'hidden_size' attribute in its config.")
 
         # Linear head: one output per task, applied to class token and average of patch tokens
-        self.head = nn.Sequential(
-            nn.Linear(hidden_size * 2, num_tasks), nn.Softplus()
-        )  # ensures output > 0
+        # self.head = nn.Sequential(
+        #     nn.Linear(hidden_size * 2, num_tasks), nn.Softplus()
+        # )  # ensures output > 0
+        self.head = nn.Linear(hidden_size * 2, num_tasks)
 
     def forward(self, *args, **kwargs):
         outputs = self.backbone(*args, **kwargs)

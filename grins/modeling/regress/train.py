@@ -91,7 +91,7 @@ def train(config_path: Path | str):
     project_config = ProjectConfiguration(
         project_dir=config.project_dir,
         logging_dir=config.project_dir,
-        automatic_checkpoint_naming=True
+        automatic_checkpoint_naming=True,
     )
     accelerator: Accelerator = config.accelerator_partial(project_config=project_config)
 
@@ -158,23 +158,28 @@ def train(config_path: Path | str):
             current_lr = optimizer.param_groups[0]["lr"]
 
             # Log
-            log_loss_per_task = {
-                f"train/{tasks_lookup_inv[task_idx]}_batch_loss": task_loss.item()
-                for task_idx, task_loss in enumerate(loss_per_task)
-            }
             if loss_function.use_task_weighting:
+                log_loss_per_task = {
+                    f"train/{tasks_lookup_inv[task_idx]}_batch_loss": task_loss.item()
+                    for task_idx, task_loss in enumerate(loss_per_task)
+                }
                 # log both sigmas and derived weights
                 log_weights = {
                     f"train/{tasks_lookup_inv[i]}_sigma": loss_function.sigmas[i].item()
                     for i in range(loss_function.num_tasks)
                 }
-                log_weights.update({
-                    f"train/{tasks_lookup_inv[i]}_weight": (0.5 / (loss_function.sigmas[i] ** 2)).item()
-                    for i in range(loss_function.num_tasks)
-                })
+                log_weights.update(
+                    {
+                        f"train/{tasks_lookup_inv[i]}_weight": (
+                            0.5 / (loss_function.sigmas[i] ** 2)
+                        ).item()
+                        for i in range(loss_function.num_tasks)
+                    }
+                )
             else:
+                log_loss_per_task = {}
                 log_weights = {}
-                
+
             log_dict = {
                 "train/batch_loss": loss.item(),
                 "train/avg_loss": train_avg_loss,
@@ -198,10 +203,10 @@ def train(config_path: Path | str):
         model.eval()
         loss_function.eval()
         with torch.inference_mode():
-            val_step_init = val_step
             for task, task_idx in tasks_lookup.items():
                 val_running_loss = 0.0
                 val_dl = val_dls[task_idx]
+                val_step = epoch * len(val_dl)
                 val_loop = tqdm(
                     val_dl, desc=f"Validation Epoch {epoch+1}/{num_epochs} - {task}", leave=False
                 )
@@ -253,12 +258,9 @@ def train(config_path: Path | str):
                     )
                 accelerator.log({f"val/{task}_avg_accuracy": accuracy_metric.compute().item()})
                 accuracy_metric.reset()
-                if task_idx < len(tasks) - 1:
-                    val_step = val_step_init
-        
+
         # Save checkpoint
         accelerator.save_state()
-        
 
 
 if __name__ == "__main__":
