@@ -52,7 +52,7 @@ dataloaders:
     num_workers: 8
 
 loss_function_partial:
-  _target_: grins.modeling.regress.model.TaskWeightedPairwiseRankingLoss
+  _target_: grins.modeling.regress.model.TaskWeightedPairwiseLogisticRankingLoss
   _partial_: true
   use_task_weighting: false
 optimizer_partial:
