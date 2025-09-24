@@ -211,12 +211,12 @@ class DINOv3Linear(nn.Module):
             output_size = num_tasks if i == num_head_layers - 1 else input_size // 2
             head_layers.append(nn.Linear(input_size, output_size))
             if i < num_head_layers - 1:
-                activation = getattr(nn, activation, None)
-                if activation is None:
+                activation_layer = getattr(nn, activation)
+                if activation_layer is None:
                     raise ValueError(
                         f"Activation function '{activation}' not found in torch.nn."
                     )
-                head_layers.append(activation())
+                head_layers.append(activation_layer())
             input_size = output_size
         self.head = nn.Sequential(*head_layers)
 
