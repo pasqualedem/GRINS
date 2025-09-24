@@ -170,5 +170,4 @@ cython_debug/
 /data
 /cache
 /wandb
-/models
 nohup.out
