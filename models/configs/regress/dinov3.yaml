@@ -21,7 +21,7 @@ datasets:
   transform:
       _target_: torchvision.transforms.Compose
       transforms:
-        - _target_: torchvision.transforms.ToTensor
+        - _target_: torchvision.transforms.PILToTensor
         - _target_: grins.data.mit_place_pulse.preprocess.RemoveWatermark
           height: 277
   train_partial:
