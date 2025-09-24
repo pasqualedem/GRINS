@@ -15,7 +15,9 @@ class TaskWeightedPairwiseRankingLoss(nn.Module):
             If True, learnable uncertainty weights per task are applied.
     """
 
-    def __init__(self, num_tasks: int, margin: float = 1.0, use_task_weighting: bool = False):
+    def __init__(
+        self, num_tasks: int, margin: float = 1.0, use_task_weighting: bool = False
+    ):
         super().__init__()
         self.num_tasks = num_tasks
         self.margin = margin
@@ -62,7 +64,9 @@ class TaskWeightedPairwiseRankingLoss(nn.Module):
                     task_loss = per_sample_loss[mask].mean()
                     sigma = self.sigmas[t]
                     # Kendall uncertainty weighting
-                    weighted_loss = 0.5 / (sigma**2) * task_loss + torch.log(1 + sigma**2)
+                    weighted_loss = 0.5 / (sigma**2) * task_loss + torch.log(
+                        1 + sigma**2
+                    )
                     loss_per_task.append(weighted_loss)
             # Sum over tasks
             total_loss = torch.stack(loss_per_task).sum()
@@ -124,7 +128,9 @@ class TaskWeightedPairwiseLogisticRankingLoss(nn.Module):
                     task_loss = per_sample_loss[mask].mean()
                     sigma = self.sigmas[t]
                     # Kendall uncertainty weighting
-                    weighted_loss = 0.5 / (sigma**2) * task_loss + torch.log(1 + sigma**2)
+                    weighted_loss = 0.5 / (sigma**2) * task_loss + torch.log(
+                        1 + sigma**2
+                    )
                     loss_per_task.append(weighted_loss)
             # Sum over tasks
             total_loss = torch.stack(loss_per_task).sum()
@@ -165,7 +171,23 @@ class TaskPairwiseCorrect(nn.Module):
 
 
 class DINOv3Linear(nn.Module):
-    def __init__(self, backbone: AutoModel, num_tasks: int, freeze_backbone: bool = True):
+    def __init__(
+        self,
+        backbone: AutoModel,
+        num_tasks: int,
+        num_head_layers: int = 1,
+        activation: str = "ReLU",
+        freeze_backbone: bool = True,
+    ):
+        """
+        Simple regression head on top of DINOv3 backbone.
+        Args:
+            backbone: Pretrained DINOv3 model from HuggingFace transformers.
+            num_tasks: Number of regression tasks (output size).
+            num_head_layers: Number of linear layers in the head (default: 1 for linear probing).
+            activation: Activation function to use between head layers.
+            freeze_backbone: If True, freeze backbone parameters.
+        """
         super().__init__()
         self.backbone = backbone
         if freeze_backbone:
@@ -175,13 +197,28 @@ class DINOv3Linear(nn.Module):
 
         hidden_size = getattr(backbone.config, "hidden_size", None)
         if hidden_size is None:
-            raise ValueError("Backbone model does not have 'hidden_size' attribute in its config.")
+            raise ValueError(
+                "Backbone model does not have 'hidden_size' attribute in its config."
+            )
 
         # Linear head: one output per task, applied to class token and average of patch tokens
         # self.head = nn.Sequential(
         #     nn.Linear(hidden_size * 2, num_tasks), nn.Softplus()
         # )  # ensures output > 0
-        self.head = nn.Linear(hidden_size * 2, num_tasks)
+        head_layers = []
+        input_size = hidden_size * 2
+        for i in range(num_head_layers):
+            output_size = num_tasks if i == num_head_layers - 1 else input_size // 2
+            head_layers.append(nn.Linear(input_size, output_size))
+            if i < num_head_layers - 1:
+                activation = getattr(nn, activation, None)
+                if activation is None:
+                    raise ValueError(
+                        f"Activation function '{activation}' not found in torch.nn."
+                    )
+                head_layers.append(activation())
+            input_size = output_size
+        self.head = nn.Sequential(*head_layers)
 
     def forward(self, *args, **kwargs):
         outputs = self.backbone(*args, **kwargs)

@@ -1,0 +1,74 @@
+seed: &seed 42
+tasks:
+  - livelier
+  - more beautiful
+  - more depressing
+  - more boring
+  - safer
+  - wealthier
+processor:
+  _target_: transformers.AutoImageProcessor.from_pretrained
+  pretrained_model_name_or_path: &pretrained_model_name_or_path facebook/dinov3-vitb16-pretrain-lvd1689m
+  do_resize: false
+backbone:
+  _target_: transformers.AutoModel.from_pretrained
+  pretrained_model_name_or_path: *pretrained_model_name_or_path
+model_params:
+  num_head_layers: 3
+  activation: GELU
+  freeze_backbone: true
+
+datasets:
+  data_dir: &data_dir data/external/mit-place-pulse
+  transform:
+      _target_: torchvision.transforms.Compose
+      transforms:
+        - _target_: torchvision.transforms.PILToTensor
+        - _target_: grins.data.mit_place_pulse.preprocess.RemoveWatermark
+          height: 277
+  train_partial:
+    _target_: grins.data.mit_place_pulse.dataset.MITPlacePulseDataset
+    _partial_: true
+    data_dir: *data_dir
+    question: null
+    seed: *seed
+    split: train
+  val_partial:
+    _target_: grins.data.mit_place_pulse.dataset.MITPlacePulseDataset
+    _partial_: true
+    data_dir: *data_dir
+    seed: *seed
+    split: val
+dataloaders:
+  train_partial:
+    _target_: torch.utils.data.DataLoader
+    _partial_: true
+    batch_size: 512
+    shuffle: true
+    num_workers: 8
+  val_partial:
+    _target_: torch.utils.data.DataLoader
+    _partial_: true
+    batch_size: 512
+    shuffle: true
+    num_workers: 8
+
+loss_function_partial:
+  _target_: grins.modeling.regress.model.TaskWeightedPairwiseLogisticRankingLoss
+  _partial_: true
+  use_task_weighting: false
+optimizer_partial:
+  _target_: torch.optim.AdamW
+  _partial_: True
+scheduler_name: constant_with_warmup
+
+project_dir: &project_dir models/regress/dinov3
+accelerator_partial:
+  _target_: accelerate.Accelerator
+  _partial_: true
+  project_dir: *project_dir
+  log_with: wandb
+init_trackers_params:
+  project_name: GRINS
+num_epochs: 10
+warmup_ratio: 0.2
