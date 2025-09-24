@@ -43,13 +43,13 @@ dataloaders:
   train_partial:
     _target_: torch.utils.data.DataLoader
     _partial_: true
-    batch_size: 512
+    batch_size: 256
     shuffle: true
     num_workers: 8
   val_partial:
     _target_: torch.utils.data.DataLoader
     _partial_: true
-    batch_size: 512
+    batch_size: 256
     shuffle: true
     num_workers: 8
 
