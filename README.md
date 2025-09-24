@@ -59,3 +59,10 @@ A short description of the project.
 
 --------
 
+## Run a training experiment
+
+To run a training experiment, use the following command:
+
+```bash
+accelerate launch --num-processes=1 -m grins.modeling.regress.train train --config-path=models/configs/regress/dinov3_multilayer_head.yaml
+```

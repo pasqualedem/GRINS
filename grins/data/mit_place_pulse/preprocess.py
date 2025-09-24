@@ -53,6 +53,6 @@ class RemoveWatermark(Transform):
 
 
 if __name__ == "__main__":
-    # remove_rows_with_missing_images(EXTERNAL_DATA_DIR / "mit-place-pulse")
-    # remove_rows_with_missing_study_question(EXTERNAL_DATA_DIR / "mit-place-pulse")
+    remove_rows_with_missing_images(EXTERNAL_DATA_DIR / "mit-place-pulse")
+    remove_rows_with_missing_study_question(EXTERNAL_DATA_DIR / "mit-place-pulse")
     keep_only_left_right_choices((EXTERNAL_DATA_DIR / "mit-place-pulse"))

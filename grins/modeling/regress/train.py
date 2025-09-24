@@ -2,6 +2,7 @@ import math
 from pathlib import Path
 
 import click
+from .loss.pairwise import TaskPairwiseCorrect
 import torch
 import torch.nn as nn
 import yaml
@@ -16,7 +17,6 @@ import torchvision.transforms.v2 as T
 from torchmetrics.aggregation import MeanMetric
 
 from ...data.mit_place_pulse.dataset import MITPlacePulseDataset
-from .model import DINOv3Linear, TaskPairwiseCorrect
 
 
 @click.group
@@ -43,7 +43,10 @@ def train(config_path: Path | str):
     num_tasks = len(tasks)
     processor: AutoImageProcessor = config.processor
     backbone: AutoModel = config.backbone
-    model = DINOv3Linear(backbone, num_tasks, **config.model_params)
+    model = config.model_partial(
+        backbone=backbone,
+        num_tasks=num_tasks,
+    )
     logger.info("Model instantiated.")
 
     # Initialize datasets and dataloaders

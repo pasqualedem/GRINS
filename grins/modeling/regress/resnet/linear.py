@@ -1,0 +1,61 @@
+import torch
+import torch.nn as nn
+from transformers import AutoModel
+
+
+class ResnetLinear(nn.Module):
+    def __init__(
+        self,
+        backbone: AutoModel,
+        num_tasks: int,
+        num_head_layers: int = 1,
+        activation: str = "ReLU",
+        freeze_backbone: bool = True,
+    ):
+        """
+        Simple regression head on top of ResNet backbone.
+        Args:
+            backbone: Pretrained ResNet model from HuggingFace transformers.
+            num_tasks: Number of regression tasks (output size).
+            num_head_layers: Number of linear layers in the head (default: 1 for linear probing).
+            activation: Activation function to use between head layers.
+            freeze_backbone: If True, freeze backbone parameters.
+        """
+        super().__init__()
+        self.backbone = backbone
+        if freeze_backbone:
+            for p in self.backbone.parameters():
+                p.requires_grad = False
+            self.backbone.eval()
+
+        hidden_size = getattr(backbone.config, "hidden_sizes", None)[-1]
+        if hidden_size is None:
+            raise ValueError(
+                "Backbone model does not have 'hidden_size' attribute in its config."
+            )
+
+        # Linear head: one output per task, applied to class token and average of patch tokens
+        # self.head = nn.Sequential(
+        #     nn.Linear(hidden_size * 2, num_tasks), nn.Softplus()
+        # )  # ensures output > 0
+        head_layers = []
+        input_size = hidden_size
+        for i in range(num_head_layers):
+            output_size = num_tasks if i == num_head_layers - 1 else input_size // 2
+            head_layers.append(nn.Linear(input_size, output_size))
+            if i < num_head_layers - 1:
+                activation_layer = getattr(nn, activation)
+                if activation_layer is None:
+                    raise ValueError(
+                        f"Activation function '{activation}' not found in torch.nn."
+                    )
+                head_layers.append(activation_layer())
+            input_size = output_size
+        self.head = nn.Sequential(*head_layers)
+
+    def forward(self, *args, **kwargs):
+        outputs = self.backbone(*args, **kwargs)
+        # Get resnet hidden states
+        hidden_state = outputs.pooler_output.squeeze()
+        return self.head(hidden_state)
+    
