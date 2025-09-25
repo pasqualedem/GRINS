@@ -170,6 +170,5 @@ cython_debug/
 /data
 /cache
 /wandb
-/checkpoints
-/out
-*.out
+/models
+nohup.out

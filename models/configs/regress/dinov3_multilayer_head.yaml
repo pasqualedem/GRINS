@@ -15,6 +15,9 @@ backbone:
   pretrained_model_name_or_path: *pretrained_model_name_or_path
 model_partial:
   _target_: grins.modeling.regress.dinov3.DINOv3Linear
+  _partial_: true
+  num_head_layers: 3
+  activation: GELU
   freeze_backbone: true
 
 datasets:
@@ -42,13 +45,13 @@ dataloaders:
   train_partial:
     _target_: torch.utils.data.DataLoader
     _partial_: true
-    batch_size: 512
+    batch_size: 256
     shuffle: true
     num_workers: 8
   val_partial:
     _target_: torch.utils.data.DataLoader
     _partial_: true
-    batch_size: 512
+    batch_size: 256
     shuffle: true
     num_workers: 8
 
@@ -61,10 +64,11 @@ optimizer_partial:
   _partial_: True
 scheduler_name: constant_with_warmup
 
-project_dir: &project_dir out/regress/dinov3
+project_dir: &project_dir models/regress/dinov3
 accelerator_partial:
   _target_: accelerate.Accelerator
   _partial_: true
+  project_dir: *project_dir
   log_with: wandb
 init_trackers_params:
   project_name: GRINS
