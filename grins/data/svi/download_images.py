@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import typer
 from loguru import logger
 from tqdm import tqdm
 
@@ -11,9 +10,8 @@ import os
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
 
-from grins.config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, API_KEY
+from ...config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, API_KEY
 
-app = typer.Typer()
 
 
 def get_street_view_image(lat, lon, heading, pitch, fov, filename):
@@ -134,10 +132,9 @@ def check_and_delete_images(directory_path, target_intensity=227, target_count=2
                 )
 
 
-@app.command()
 def main(
-    csv_file_path: Path = EXTERNAL_DATA_DIR / "coordinates_Manhattan_NYC_USA.csv",
-    image_path: Path = PROCESSED_DATA_DIR / "street_view_images_Manhattan_NYC_USA",
+    csv_file_path: Path = EXTERNAL_DATA_DIR / "coordinates_Bari_Italy_spacing.csv",
+    image_path: Path = PROCESSED_DATA_DIR / "svi_Bari_Italy_spacing",
 ):
     image_path.mkdir(parents=True, exist_ok=True)
 
@@ -153,4 +150,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    main()
