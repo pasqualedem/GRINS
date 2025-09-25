@@ -171,4 +171,4 @@ cython_debug/
 /cache
 /wandb
 /checkpoints
-nohup.out
+*.out
