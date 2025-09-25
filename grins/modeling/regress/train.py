@@ -1,5 +1,6 @@
 import math
 from pathlib import Path
+from datetime import datetime
 
 import click
 from .loss.pairwise import TaskPairwiseCorrect
@@ -26,12 +27,25 @@ def cli():
 
 @cli.command
 @click.option("--config-path", type=click.Path(exists=True), required=True)
-def train(config_path: Path | str):
+@click.option("--project-dir", type=click.Path(), required=False, default=None)
+def train(config_path: Path | str, project_dir: Path | str):
     # read the yaml
     config_path = Path(config_path)
     with config_path.open("r") as f:
         config_dict = yaml.safe_load(f)
     config = instantiate(config_dict)
+
+    project_dir = project_dir or config.project_dir
+    project_dir = Path(project_dir)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate a unique name with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    project_dir = project_dir / f"run_{timestamp}"
+
+    project_dir.mkdir(parents=True, exist_ok=True)
+    logger.add(project_dir / "train.log", rotation="10 MB")
+    logger.info(f"Logging to {project_dir}/train.log")
 
     # Set seed
     set_seed(config.seed)
@@ -92,8 +106,8 @@ def train(config_path: Path | str):
 
     # Accelerate!
     project_config = ProjectConfiguration(
-        project_dir=config.project_dir,
-        logging_dir=config.project_dir,
+        project_dir=project_dir,
+        logging_dir=project_dir,
         automatic_checkpoint_naming=True,
     )
     accelerator: Accelerator = config.accelerator_partial(project_config=project_config)

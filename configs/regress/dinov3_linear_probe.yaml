@@ -61,11 +61,10 @@ optimizer_partial:
   _partial_: True
 scheduler_name: constant_with_warmup
 
-project_dir: &project_dir checkpoints/regress/dinov3
+project_dir: &project_dir out/regress/dinov3
 accelerator_partial:
   _target_: accelerate.Accelerator
   _partial_: true
-  project_dir: *project_dir
   log_with: wandb
 init_trackers_params:
   project_name: GRINS
