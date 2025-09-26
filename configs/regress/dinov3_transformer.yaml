@@ -62,6 +62,7 @@ loss_function_partial:
 optimizer_partial:
   _target_: torch.optim.AdamW
   _partial_: True
+  lr: 0.00005
 scheduler_name: constant_with_warmup
 
 project_dir: out/regress/dinov3_transformer
