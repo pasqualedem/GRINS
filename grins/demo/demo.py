@@ -12,6 +12,7 @@ from grins.config import EXTERNAL_DATA_DIR, PROCESSED_DATA_DIR, PROJ_ROOT
 from grins.data.mit_place_pulse.preprocess import RemoveWatermark
 from grins.modeling.regress.dinov3 import DINOv3Linear
 from safetensors.torch import load_file
+import pandas as pd
 
 
 st.set_page_config(layout="wide")
@@ -46,6 +47,13 @@ model.load_state_dict(
     )
 )
 
+def score_converter(x):
+    # Scores ranges from -4 to +4, we convert them to 1-10 scale
+    # First clamp x to be within -4 to +4
+    x = max(-4, min(4, x))
+    # Then convert to 1-10 scale
+    return ((x + 4) / 8) * 9 + 1
+
 
 def load_images_from_folder(folder):
     images = []
@@ -66,7 +74,7 @@ def model_predict(images):
 
 
 def main():
-    st.title("Image Ranking Demo")
+    st.title("Rivalorizzaziamo Bari attraverso l'Intelligenza Artificiale (GRINS)")
     tasks = ["Vivacità", "Bellezza", "Tristezza", "Noia", "Sicurezza", "Ricchezza"]
 
     if os.path.isdir(IMAGE_FOLDER):
@@ -90,7 +98,7 @@ def main():
                     cols = st.columns(5)
                     for idx, col in enumerate(cols):
                         col.image(ranked_images[idx], use_container_width=True)
-                        col.caption(f"Score: {'⭐' * (idx + 1)} ({ranked_scores[idx]:.2f})")
+                        col.caption(f"Punteggio: {'⭐' * (round(score_converter(ranked_scores[idx])))} ({score_converter(ranked_scores[idx]):.2f})")
         else:
             st.warning("Not enough images in the folder. Provide at least 5 images.")
     else:
