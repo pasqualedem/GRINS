@@ -178,7 +178,7 @@ def main():
         if not valid:
             st.warning("Correggi gli errori sopra e reinvia.")
             return
-        
+
         # Salva i risultati in CSV
         save_results_to_csv(user_rankings, selected_images)
 
@@ -216,7 +216,8 @@ def main():
                     c.image(selected_images[img_idx]["image"], use_container_width=True)
                 except Exception:
                     c.text("Errore immagine")
-                c.caption(f"Punteggio AI: {score_converter(ai_scores[img_idx, i]):.2f}")
+                ai_score = score_converter(ai_scores[img_idx, i])
+                c.caption(f"Punteggio AI: {'⭐' * round(ai_score)} {ai_score:.2f}")
 
             # --- Correlazione tipo Spearman (Pearson sulle ranks)
             # Per ogni immagine costruisco il rank: user_rank(img_idx) e ai_rank(img_idx)
