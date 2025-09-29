@@ -220,6 +220,8 @@ def train(config_path: Path | str, project_dir: Path | str):
         model.eval()
         loss_function.eval()
         with torch.inference_mode():
+            task_losses = {}
+            task_accuracies = {}
             for task, task_idx in tasks_lookup.items():
                 val_running_loss = 0.0
                 val_dl = val_dls[task_idx]
@@ -273,8 +275,20 @@ def train(config_path: Path | str, project_dir: Path | str):
                             "avg_loss": f"{val_avg_loss:.4f}",
                         }
                     )
-                accelerator.log({f"val/{task}_avg_accuracy": accuracy_metric.compute().item()})
+                task_losses[task] = val_avg_loss
+                task_accuracies[task] = accuracy_metric.compute().item()
+                accelerator.log({f"val/{task}_avg_accuracy": task_accuracies[task]})
                 accuracy_metric.reset()
+                
+            # Log average validation loss and accuracy over all tasks
+            avg_val_loss = sum(task_losses.values()) / len(task_losses)
+            avg_val_accuracy = sum(task_accuracies.values()) / len(task_accuracies)
+            accelerator.log(
+                {
+                    "val/avg_loss": avg_val_loss,
+                    "val/avg_accuracy": avg_val_accuracy,
+                }
+            )
 
         # Save checkpoint
         accelerator.save_state()
