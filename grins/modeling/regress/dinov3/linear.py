@@ -10,7 +10,7 @@ class DINOv3Linear(nn.Module):
         num_tasks: int,
         num_head_layers: int = 1,
         activation: str = "ReLU",
-        freeze_backbone: bool = True,
+        freeze_backbone: bool | str = True,
     ):
         """
         Simple regression head on top of DINOv3 backbone.
@@ -19,14 +19,28 @@ class DINOv3Linear(nn.Module):
             num_tasks: Number of regression tasks (output size).
             num_head_layers: Number of linear layers in the head (default: 1 for linear probing).
             activation: Activation function to use between head layers.
-            freeze_backbone: If True, freeze backbone parameters.
+            freeze_backbone: If True, freeze all backbone parameters. If "attentions", freeze all except attention layers.
         """
         super().__init__()
         self.backbone = backbone
-        if freeze_backbone:
+
+        if freeze_backbone is True:
             for p in self.backbone.parameters():
                 p.requires_grad = False
             self.backbone.eval()
+        elif freeze_backbone == "attentions":
+            for name, param in self.backbone.named_parameters():
+                if "attention" in name.lower():
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+            self.backbone.eval()
+        elif not freeze_backbone:
+            pass  # do not freeze anything
+        else:
+            raise ValueError(
+                f"freeze_backbone must be bool or 'attentions', got {freeze_backbone}"
+            )
 
         hidden_size = getattr(backbone.config, "hidden_size", None)
         if hidden_size is None:
@@ -34,10 +48,6 @@ class DINOv3Linear(nn.Module):
                 "Backbone model does not have 'hidden_size' attribute in its config."
             )
 
-        # Linear head: one output per task, applied to class token and average of patch tokens
-        # self.head = nn.Sequential(
-        #     nn.Linear(hidden_size * 2, num_tasks), nn.Softplus()
-        # )  # ensures output > 0
         head_layers = []
         input_size = hidden_size * 2
         for i in range(num_head_layers):
