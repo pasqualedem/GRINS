@@ -18,7 +18,7 @@ model_partial:
   _partial_: true
   num_transformer_layers: 2
   activation: GELU
-  freeze_backbone: attention
+  freeze_backbone: attentions
 
 datasets:
   data_dir: &data_dir data/external/mit-place-pulse

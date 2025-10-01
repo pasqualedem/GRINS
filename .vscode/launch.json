@@ -14,7 +14,7 @@
                 "-m",
                 "grins.modeling.regress.train",
                 "train",
-                "--config-path=configs/regress/resnet50_multilayer_head_unfrozen.yaml"
+                "--config-path=configs/regress/dinov3_transformer_weighted_unfrozen.yaml"
             ]
         }
     ]

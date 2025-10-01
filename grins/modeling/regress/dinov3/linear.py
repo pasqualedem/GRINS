@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel
 
+from .base import DINOv3Base
 
-class DINOv3Linear(nn.Module):
+
+class DINOv3Linear(DINOv3Base):
     def __init__(
         self,
         backbone: AutoModel,
@@ -21,26 +23,10 @@ class DINOv3Linear(nn.Module):
             activation: Activation function to use between head layers.
             freeze_backbone: If True, freeze all backbone parameters. If "attentions", freeze all except attention layers.
         """
-        super().__init__()
-        self.backbone = backbone
-
-        if freeze_backbone is True:
-            for p in self.backbone.parameters():
-                p.requires_grad = False
-            self.backbone.eval()
-        elif freeze_backbone == "attentions":
-            for name, param in self.backbone.named_parameters():
-                if "attention" in name.lower():
-                    param.requires_grad = True
-                else:
-                    param.requires_grad = False
-            self.backbone.eval()
-        elif not freeze_backbone:
-            pass  # do not freeze anything
-        else:
-            raise ValueError(
-                f"freeze_backbone must be bool or 'attentions', got {freeze_backbone}"
-            )
+        super().__init__(
+            backbone=backbone,
+            freeze_backbone=freeze_backbone,
+        )
 
         hidden_size = getattr(backbone.config, "hidden_size", None)
         if hidden_size is None:
