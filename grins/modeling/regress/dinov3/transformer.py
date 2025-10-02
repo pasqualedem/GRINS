@@ -23,6 +23,8 @@ class DINOv3Transformer(DINOv3Base):
             activation: Activation function to use between head layers.
             freeze_backbone: If True, freeze backbone parameters.
         """
+        assert num_transformer_layers >= 1, "num_transformer_layers must be >= 1"
+        assert num_tasks >= 1, "num_tasks must be >= 1"
         super().__init__(
             backbone=backbone,
             freeze_backbone=freeze_backbone,
@@ -34,27 +36,24 @@ class DINOv3Transformer(DINOv3Base):
                 "Backbone model does not have 'hidden_size' attribute in its config."
             )
 
-        transformer_layers = []
-        transformer_layers.extend(
-            nn.TransformerEncoderLayer(
-                d_model=hidden_size * 2,
-                nhead=8,
-                dim_feedforward=hidden_size * 4,
-                activation=activation.lower(),
-                batch_first=True,
-            )
-            for _ in range(num_transformer_layers)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_size,
+            nhead=8,
+            dim_feedforward=hidden_size * 4,
+            activation=activation.lower(),
+            batch_first=True,
         )
-        linear_layer = nn.Linear(hidden_size * 2, num_tasks)
-        self.head = nn.Sequential(*[*transformer_layers, linear_layer])
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer, num_layers=num_transformer_layers
+        )
+        self.head = nn.Linear(hidden_size * 2, num_tasks)
 
     def forward(self, *args, **kwargs):
         outputs = self.backbone(*args, **kwargs)
-        # Use pooled output if available, else first token
-        pooled = getattr(outputs, "pooler_output", None)
-        if pooled is None:
-            pooled = outputs.last_hidden_state[:, 0]
-        patches_last_hidden_state = outputs.last_hidden_state[:, 5:, :]  # [B, P-5, C]
-        avg_patches_hidden_state = patches_last_hidden_state.mean(dim=1)  # [B, C]
-        features = torch.cat([pooled, avg_patches_hidden_state], dim=-1)  # [B, 2*C]
+        transformer_input = outputs.last_hidden_state  # [B, P, C]
+        outputs = self.transformer(transformer_input)  # [B, P-4, C]
+        pooled = outputs[:, 0, :]  # [B, C]
+        patch_outputs = outputs[:, 5:, :]  # [B, P-5, C]
+        avg_patch_outputs = patch_outputs.mean(dim=1)  # [B, C]
+        features = torch.cat([pooled, avg_patch_outputs], dim=-1)  # [B, 2*C]
         return self.head(features)
