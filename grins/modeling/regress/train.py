@@ -25,6 +25,94 @@ def cli():
     pass
 
 
+def evaluate_model(
+    model: nn.Module,
+    val_dls: list[DataLoader],
+    tasks_lookup: dict[str, int],
+    loss_function: nn.Module,
+    correct_function,
+    accuracy_metric: MeanMetric,
+    accelerator: Accelerator,
+    num_epochs: int,
+    epoch: int,
+):
+        # Validation
+        model.eval()
+        loss_function.eval()
+        with torch.inference_mode():
+            task_losses = {}
+            task_accuracies = {}
+            for task, task_idx in tasks_lookup.items():
+                val_running_loss = 0.0
+                val_dl = val_dls[task_idx]
+                val_step = epoch * len(val_dl)
+                val_loop = tqdm(
+                    val_dl, desc=f"Validation Epoch {epoch+1}/{num_epochs} - {task}", leave=False
+                )
+                for i, batch in enumerate(val_loop):
+                    # Read batch
+                    images0, images1, labels, tasks = (
+                        batch["images0"],
+                        batch["images1"],
+                        batch["labels"],
+                        batch["questions"],
+                    )
+                    task_idxs = torch.tensor(
+                        [tasks_lookup[t] for t in tasks],
+                        dtype=torch.long,
+                        device=accelerator.device,
+                    )
+
+                    # Forward pass
+                    scores0 = model(pixel_values=images0)  # [B, num_tasks]
+                    scores1 = model(pixel_values=images1)  # [B, num_tasks]
+
+                    # Compute loss
+                    loss, loss_per_task = loss_function(scores0, scores1, task_idxs, labels)
+
+                    # Compute accuracy
+                    correct = correct_function(scores0, scores1, task_idxs, labels)
+                    batch_accuracy = accuracy_metric(correct)
+
+                    # Update running loss
+                    val_running_loss += loss.item()
+                    val_avg_loss = val_running_loss / (i + 1)
+
+                    # Log
+                    log_dict = {
+                        f"val/{task}_batch_loss": loss.item(),
+                        f"val/{task}_avg_loss": val_avg_loss,
+                        f"val/{task}_batch_accuracy": batch_accuracy,
+                        "val/step": val_step,
+                    }
+                    accelerator.log(log_dict)
+                    val_step += 1
+
+                    # Update tqdm bar with loss and LR
+                    val_loop.set_postfix(
+                        {
+                            "batch_loss": f"{loss.item():.4f}",
+                            "avg_loss": f"{val_avg_loss:.4f}",
+                        }
+                    )
+                task_losses[task] = val_avg_loss
+                task_accuracies[task] = accuracy_metric.compute().item()
+                accelerator.log({f"val/{task}_avg_accuracy": task_accuracies[task]})
+                accuracy_metric.reset()
+                
+            # Log average validation loss and accuracy over all tasks
+            avg_val_loss = sum(task_losses.values()) / len(task_losses)
+            avg_val_accuracy = sum(task_accuracies.values()) / len(task_accuracies)
+            accelerator.log(
+                {
+                    "val/avg_loss": avg_val_loss,
+                    "val/avg_accuracy": avg_val_accuracy,
+                }
+            )
+
+        # Save checkpoint
+        accelerator.save_state()
+
 @cli.command
 @click.option("--config-path", type=click.Path(exists=True), required=True)
 @click.option("--project-dir", type=click.Path(), required=False, default=None)
@@ -215,83 +303,108 @@ def train(config_path: Path | str, project_dir: Path | str):
                     "lr": f"{current_lr:.2e}",
                 }
             )
+        evaluate_model(
+            model=model,
+            val_dls=val_dls,
+            tasks_lookup=tasks_lookup,
+            loss_function=loss_function,
+            correct_function=correct_function,
+            accuracy_metric=accuracy_metric,
+            accelerator=accelerator,
+            num_epochs=num_epochs,
+            epoch=epoch,
+        )   
+        # End of epoch
 
-        # Validation
-        model.eval()
-        loss_function.eval()
-        with torch.inference_mode():
-            task_losses = {}
-            task_accuracies = {}
-            for task, task_idx in tasks_lookup.items():
-                val_running_loss = 0.0
-                val_dl = val_dls[task_idx]
-                val_step = epoch * len(val_dl)
-                val_loop = tqdm(
-                    val_dl, desc=f"Validation Epoch {epoch+1}/{num_epochs} - {task}", leave=False
-                )
-                for i, batch in enumerate(val_loop):
-                    # Read batch
-                    images0, images1, labels, tasks = (
-                        batch["images0"],
-                        batch["images1"],
-                        batch["labels"],
-                        batch["questions"],
-                    )
-                    task_idxs = torch.tensor(
-                        [tasks_lookup[t] for t in tasks],
-                        dtype=torch.long,
-                        device=accelerator.device,
-                    )
+@cli.command()
+@click.option("--config-path", type=click.Path(exists=True), required=True)
+@click.option("--project-dir", type=click.Path(), required=False, default=None)
+def validate(config_path: Path | str, project_dir: Path | str):
+    # read the yaml
+    config_path = Path(config_path)
+    with config_path.open("r") as f:
+        config_dict = yaml.safe_load(f)
+    config = instantiate(config_dict)
 
-                    # Forward pass
-                    scores0 = model(pixel_values=images0)  # [B, num_tasks]
-                    scores1 = model(pixel_values=images1)  # [B, num_tasks]
+    project_dir = project_dir or config.project_dir
+    project_dir = Path(project_dir)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate a unique name with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    project_dir = project_dir / f"run_{timestamp}"
 
-                    # Compute loss
-                    loss, loss_per_task = loss_function(scores0, scores1, task_idxs, labels)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    logger.add(project_dir / "train.log", rotation="10 MB")
+    logger.info(f"Logging to {project_dir}/train.log")
 
-                    # Compute accuracy
-                    correct = correct_function(scores0, scores1, task_idxs, labels)
-                    batch_accuracy = accuracy_metric(correct)
-
-                    # Update running loss
-                    val_running_loss += loss.item()
-                    val_avg_loss = val_running_loss / (i + 1)
-
-                    # Log
-                    log_dict = {
-                        f"val/{task}_batch_loss": loss.item(),
-                        f"val/{task}_avg_loss": val_avg_loss,
-                        f"val/{task}_batch_accuracy": batch_accuracy,
-                        "val/step": val_step,
-                    }
-                    accelerator.log(log_dict)
-                    val_step += 1
-
-                    # Update tqdm bar with loss and LR
-                    val_loop.set_postfix(
-                        {
-                            "batch_loss": f"{loss.item():.4f}",
-                            "avg_loss": f"{val_avg_loss:.4f}",
-                        }
-                    )
-                task_losses[task] = val_avg_loss
-                task_accuracies[task] = accuracy_metric.compute().item()
-                accelerator.log({f"val/{task}_avg_accuracy": task_accuracies[task]})
-                accuracy_metric.reset()
-                
-            # Log average validation loss and accuracy over all tasks
-            avg_val_loss = sum(task_losses.values()) / len(task_losses)
-            avg_val_accuracy = sum(task_accuracies.values()) / len(task_accuracies)
-            accelerator.log(
-                {
-                    "val/avg_loss": avg_val_loss,
-                    "val/avg_accuracy": avg_val_accuracy,
-                }
-            )
-
-        # Save checkpoint
-        accelerator.save_state()
+    # Set seed
+    set_seed(config.seed)
+    
+    # Initialize model
+    tasks: list[str] = config.tasks
+    tasks_lookup = {task: i for i, task in enumerate(tasks)}
+    num_tasks = len(tasks)
+    processor: AutoImageProcessor = config.processor
+    backbone: AutoModel = config.backbone
+    model = config.model_partial(
+        backbone=backbone,
+        processor=processor,
+        num_tasks=num_tasks,
+    )
+    logger.info("Model instantiated.")
+    
+    # Initialize datasets and dataloaders
+    transform: Dataset = config.datasets.transform
+    val_dss: list[Dataset] = [
+        config.datasets.val_partial(question=task, transform=transform, processor=processor)
+        for task in tasks
+    ]
+    val_dls: list[DataLoader] = [
+        config.dataloaders.val_partial(dataset=ds, collate_fn=ds.collate_fn) for ds in val_dss
+    ]
+    logger.info("Datasets instantiated.")
+    for ds in val_dss:
+        logger.info(f"Val dataset size for {ds.question}: {len(ds)}")
+    
+    # Accelerate!
+    project_config = ProjectConfiguration(
+        project_dir=project_dir,
+        logging_dir=project_dir,
+        automatic_checkpoint_naming=True,
+    )
+    accelerator: Accelerator = config.accelerator_partial(project_config=project_config)
+    accelerator.init_trackers(
+        **config.init_trackers_params,
+        config=config_dict,
+        init_kwargs={"wandb": {"group": "regress"}},
+    )
+    wandb_tracker = accelerator.get_tracker("wandb", unwrap=True)
+    wandb_tracker.define_metric("val/step")
+    wandb_tracker.define_metric("val/*", step_metric="val/step")
+    
+    model = accelerator.prepare(model)
+    model.eval()
+    
+    val_dls = [accelerator.prepare(dl) for dl in val_dls]
+    # Loss and metrics
+    loss_function: nn.Module = config.loss_function_partial(num_tasks=num_tasks)
+    correct_function = TaskPairwiseCorrect()
+    accuracy_metric = MeanMetric()
+    accuracy_metric = accelerator.prepare(accuracy_metric)
+    
+    # Validate
+    evaluate_model(
+        model=model,
+        val_dls=val_dls,
+        tasks_lookup=tasks_lookup,
+        loss_function=loss_function,
+        correct_function=correct_function,
+        accuracy_metric=accuracy_metric,
+        accelerator=accelerator,
+        num_epochs=1,
+        epoch=0,
+    )
 
 
 if __name__ == "__main__":

@@ -16,6 +16,19 @@
                 "train",
                 "--config-path=configs/regress/dinov3_transformer_weighted_unfrozen.yaml"
             ]
+        },
+        {
+            "name": "Random Regressor",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "accelerate.commands.launch",
+            "args": [
+                "--num-processes=1",
+                "-m",
+                "grins.modeling.regress.train",
+                "validate",
+                "--config-path=configs/regress/random.yaml"
+            ]
         }
     ]
 }
