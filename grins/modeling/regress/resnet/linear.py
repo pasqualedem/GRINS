@@ -56,6 +56,6 @@ class ResnetLinear(nn.Module):
     def forward(self, *args, **kwargs):
         outputs = self.backbone(*args, **kwargs)
         # Get resnet hidden states
-        hidden_state = outputs.pooler_output.squeeze()
+        hidden_state = outputs.pooler_output.squeeze(-1).squeeze(-1)
         return self.head(hidden_state)
     
