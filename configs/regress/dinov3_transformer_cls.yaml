@@ -19,6 +19,7 @@ model_partial:
   num_transformer_layers: 2
   activation: GELU
   freeze_backbone: true
+  with_task_cls: true
 
 datasets:
   data_dir: &data_dir data/external/mit-place-pulse
@@ -65,7 +66,7 @@ optimizer_partial:
   lr: 2.e-4
 scheduler_name: constant_with_warmup
 
-project_dir: out/regress/dinov3_transformer
+project_dir: out/regress/dinov3_transformer_cls
 accelerator_partial:
   _target_: accelerate.Accelerator
   _partial_: true

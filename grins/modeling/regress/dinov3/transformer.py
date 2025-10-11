@@ -12,6 +12,7 @@ class DINOv3Transformer(DINOv3Base):
         num_tasks: int,
         num_transformer_layers: int = 1,
         activation: str = "ReLU",
+        with_task_cls: bool = False,
         freeze_backbone: bool = True,
     ):
         """
@@ -21,6 +22,7 @@ class DINOv3Transformer(DINOv3Base):
             num_tasks: Number of regression tasks (output size).
             num_layers: Number of linear layers in the head (default: 1 for linear probing).
             activation: Activation function to use between head layers.
+            with_task_cls: If True, use a separate classification token for each task.
             freeze_backbone: If True, freeze backbone parameters.
         """
         assert num_transformer_layers >= 1, "num_transformer_layers must be >= 1"
@@ -29,6 +31,9 @@ class DINOv3Transformer(DINOv3Base):
             backbone=backbone,
             freeze_backbone=freeze_backbone,
         )
+
+        self.num_tasks = num_tasks
+        self.with_task_cls = with_task_cls
 
         hidden_size = getattr(backbone.config, "hidden_size", None)
         if hidden_size is None:
@@ -46,14 +51,42 @@ class DINOv3Transformer(DINOv3Base):
         self.transformer = nn.TransformerEncoder(
             encoder_layer, num_layers=num_transformer_layers
         )
-        self.head = nn.Linear(hidden_size * 2, num_tasks)
+
+        if with_task_cls:
+            self.task_cls = nn.Embedding(num_tasks, hidden_size)
+            # make num_tasks classification heads
+            self.head = nn.ModuleList(
+                [
+                    nn.Linear(hidden_size, 1)
+                    for _ in range(num_tasks)
+                ]
+            )
+        else:
+            self.task_cls = None
+            self.head = nn.Linear(hidden_size * 2, num_tasks)
 
     def forward(self, *args, **kwargs):
         outputs = self.backbone(*args, **kwargs)
         transformer_input = outputs.last_hidden_state  # [B, P, C]
+        
+        if self.with_task_cls:
+            # prepend task classification tokens
+            B, P, C = transformer_input.shape
+            task_cls_tokens = self.task_cls.weight.unsqueeze(0).expand(B, -1, -1)  # [B, num_tasks, C]
+            transformer_input = torch.cat([task_cls_tokens, transformer_input], dim=1)  # [B, num_tasks + P, C]
+
         outputs = self.transformer(transformer_input)  # [B, P-4, C]
-        pooled = outputs[:, 0, :]  # [B, C]
-        patch_outputs = outputs[:, 5:, :]  # [B, P-5, C]
-        avg_patch_outputs = patch_outputs.mean(dim=1)  # [B, C]
-        features = torch.cat([pooled, avg_patch_outputs], dim=-1)  # [B, 2*C]
-        return self.head(features)
+        
+        if not self.with_task_cls:
+            pooled = outputs[:, 0, :]  # [B, C]
+            patch_outputs = outputs[:, 5:, :]  # [B, P-5, C]
+            avg_patch_outputs = patch_outputs.mean(dim=1)  # [B, C]
+            features = torch.cat([pooled, avg_patch_outputs], dim=-1)  # [B, 2*C]
+            return self.head(features)  # [B, num_tasks]
+        else:
+            features = outputs[:, :self.num_tasks, :]
+            # give each task its own head
+            output = []
+            for i in range(self.num_tasks):
+                output.append(self.head[i](features[:, i, :]))  # [B, 1]
+            return torch.cat(output, dim=-1)  # [B, num_tasks]
