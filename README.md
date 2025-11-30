@@ -1,65 +1,43 @@
 # GRINS
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
+## Setup
 
-A short description of the project.
+### 1. Create and activate a UV environment
 
-## Project Organization
+```bash
+# Create a new UV environment
+uv sync
 
-```
-├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         grins and configuration for tools like black
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── grins   <- Source code for use in this project.
-    │
-    ├── __init__.py             <- Makes grins a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
-    │
-    ├── dataset.py              <- Scripts to download or generate data
-    │
-    ├── features.py             <- Code to create features for modeling
-    │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
-    │
-    └── plots.py                <- Code to create visualizations
+# Activate the environment
+source .venv/bin/activate
 ```
 
---------
+## Data Preparation
 
-## Run a training experiment
+### 1. MIT Place Pulse 2.0 Dataset
+
+1. Download the [MIT Place Pulse 2.0 dataset](https://www.kaggle.com/datasets/shubham6147/mit-place-pulse) from Kaggle
+   
+2. Unzip the dataset into the `data/external` directory:
+    ```bash
+    # Create the data directory if it doesn't exist
+    mkdir -p data/external
+
+    # Unzip the downloaded dataset
+    unzip ~/Downloads/mit-place-pulse.zip -d data/external/
+    ```
+
+3. Preprocess the dataset:
+    ```bash
+    python -m grins.data.mit_place_pulse.preprocess
+    ```
+    This will create a `df.csv` file in the data directory, with cleaned annotations (e.g. only rows with valid images).
+
+### 2. Custom SVI Dataset
+
+
+
+## Run a Training Experiment
 
 To run a training experiment, use the following command:
 
