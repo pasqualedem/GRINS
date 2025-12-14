@@ -6,7 +6,9 @@ import osmnx as ox
 import geopandas as gpd
 from shapely.geometry import LineString, Point
 from pathlib import Path
-from ...config import EXTERNAL_DATA_DIR  # adjust if needed
+import click
+from ...config import SVI_DATA_DIR
+from .viz import plot_points_from_csv
 
 # reproducibility
 random.seed(42)
@@ -107,6 +109,9 @@ def get_points_csv(
         n_points (int): Number of points (used for 'random' or 'fixed').
         spacing_m (float): Spacing distance (used in spacing and grid).
         offset_m (float): Offset distance (only used for spacing).
+    
+    Returns:
+        Path: Path to the saved CSV file
     """
     if method == "random":
         G = ox.graph_from_place(location, network_type="drive")
@@ -117,10 +122,13 @@ def get_points_csv(
     else:
         raise ValueError("method must be 'random' or 'spacing'")
 
+    # Create location folder structure
+    location_folder_name = location.replace(", ", "_").replace(" ", "_")
+    location_dir = SVI_DATA_DIR / location_folder_name
+    location_dir.mkdir(parents=True, exist_ok=True)
+
     # Save to CSV
-    csv_path = (
-        EXTERNAL_DATA_DIR / f'coordinates_{location.replace(", ", "_")}_{method}.csv'
-    )
+    csv_path = location_dir / f'coordinates_{method}.csv'
     with open(csv_path, "w") as f:
         f.write("ID,lon,lat\n")
         for i, lon, lat in points:
@@ -130,6 +138,48 @@ def get_points_csv(
     return csv_path
 
 
+@click.command()
+@click.option('--location', '-l', required=True, help='Place name (e.g., "Bari, Italy")')
+@click.option('--method', '-m', type=click.Choice(['random', 'spacing']), default='spacing', 
+              help='Method to generate points')
+@click.option('--n-points', '-n', type=int, default=None,
+              help='Number of points (required for random, optional for spacing)')
+@click.option('--spacing', '-s', type=float, default=40.0,
+              help='Spacing distance in meters (for spacing method)')
+@click.option('--offset', '-o', type=float, default=15.0,
+              help='Offset distance in meters (for spacing method)')
+@click.option('--zoom', '-z', type=float, default=2500.0,
+              help='Zoom level for visualization in meters')
+@click.option('--skip-viz', is_flag=True, help='Skip visualization generation')
+def main(location, method, n_points, spacing, offset, zoom, skip_viz):
+    """Download coordinates from OpenStreetMap and optionally create visualization."""
+    
+    click.echo(f"Downloading coordinates for {location} using {method} method...")
+    
+    # Download coordinates
+    csv_path = get_points_csv(
+        location=location,
+        method=method,
+        n_points=n_points,
+        spacing_m=spacing,
+        offset_m=offset
+    )
+    
+    click.echo(f"✓ Coordinates saved to {csv_path}")
+    
+    # Generate visualization
+    if not skip_viz:
+        click.echo("Generating visualization...")
+        location_folder_name = location.replace(", ", "_").replace(" ", "_")
+        location_dir = SVI_DATA_DIR / location_folder_name
+        
+        fig = plot_points_from_csv(location, csv_path, zoom_m=zoom)
+        fig_path = location_dir / f"visualization_{method}.png"
+        fig.savefig(fig_path, dpi=300)
+        click.echo(f"✓ Visualization saved to {fig_path}")
+    
+    click.echo("✓ Done!")
+
+
 if __name__ == "__main__":
-    # Example usage
-    get_points_csv("Bari, Italy", method="spacing", n_points=1000)
+    main()

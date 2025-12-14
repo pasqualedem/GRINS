@@ -35,7 +35,15 @@ source .venv/bin/activate
 
 ### 2. Custom SVI Dataset
 
+1. Download coordinates and generate visualization:
+    ```bash
+    python -m grins.data.svi.download_coordinates -l "Bari, Italy" -m spacing -n 10000 -s 40 -o 15 -z 2500
+    ```
 
+2. Download street view images for the coordinates:
+    ```bash
+    python -m grins.data.svi.download_images -l "Bari, Italy" -m spacing
+    ```
 
 ## Run a Training Experiment
 
