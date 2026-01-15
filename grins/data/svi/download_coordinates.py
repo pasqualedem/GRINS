@@ -85,7 +85,7 @@ def _get_points_with_spacing(location, spacing_m=40.0, offset_m=15.0, n_points=N
     pts_gdf = gpd.GeoDataFrame(meta, geometry=pts, crs=edges_gdf.crs)
     pts_wgs = pts_gdf.to_crs(epsg=4326)
     points = [(i, p.x, p.y) for i, p in enumerate(pts_wgs.geometry, start=1)]
-    
+
     if n_points is not None and len(points) > n_points:
         points = random.sample(points, n_points)
     return points
