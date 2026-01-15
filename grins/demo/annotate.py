@@ -6,7 +6,8 @@ from PIL import Image
 
 import pandas as pd
 import plotly.express as px
-import matplotlib.pyplot as plt
+
+from matplotlib.colors import to_hex
 from matplotlib import cm
 
 from transformers import (
@@ -115,9 +116,9 @@ def semantic_stats(segmentation, id2label):
     for class_id, label in id2label.items():
         pixels = int((segmentation == class_id).sum())
         if pixels > 0:
-            stats.append((label, 100 * pixels / total))
+            stats.append((class_id, label, 100 * pixels / total))
 
-    return sorted(stats, key=lambda x: x[1], reverse=True)
+    return sorted(stats, key=lambda x: x[2], reverse=True)
 
 # ============================================================
 # DYNAMIC COLOR MAPPING (NO FIXED COLORS)
@@ -145,15 +146,30 @@ def segmentation_to_rgb(segmentation):
 # ============================================================
 
 def plot_stats(stats):
-    df = pd.DataFrame(stats, columns=["Class", "Percentage"])
+    df = pd.DataFrame(stats, columns=["ID", "Label", "Percentage"])
+    # Assumiamo che df["Class"] contenga gli stessi ID della segmentazione
+    classes = np.unique(df["ID"])
+
+    # Colormap identica a quella della funzione segmentation_to_rgb
+    cmap = cm.get_cmap("tab20", len(classes))
+
+    # Generiamo la mappa classe -> HEX (Plotly accetta HEX o stringhe RGB)
+    id_to_color = {
+        int(k): to_hex(cmap(i)[:3])
+        for i, k in enumerate(classes)
+    }
+    df["ID_str"] = df["ID"].astype(str)
 
     fig = px.bar(
         df,
         x="Percentage",
-        y="Class",
+        y="Label",
         orientation="h",
         text="Percentage",
+        color="ID_str",  # this tells Plotly to color bars based on ID
+        color_discrete_map={str(k): v for k, v in id_to_color.items()}  # map as strings
     )
+
 
     fig.update_layout(
         height=500,
