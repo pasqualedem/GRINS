@@ -37,6 +37,7 @@ dependencies = [
     "frozenlist==1.7.0",
     "gitdb==4.0.12",
     "gitpython==3.1.45",
+    "grad-cam>=1.5.5",
     "hf-xet==1.1.10",
     "huggingface-hub==0.35.0",
     "hydra-core==1.3.2",
@@ -111,6 +112,7 @@ dependencies = [
     "safetensors==0.6.2",
     "scikit-learn==1.7.2",
     "scipy==1.16.2",
+    "segment-anything",
     "sentencepiece==0.2.0",
     "sentry-sdk==2.38.0",
     "setuptools==80.9.0",
@@ -144,4 +146,5 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-diffusers = { git = "https://github.com/huggingface/diffusers", rev = "58bf2682612bc29b7cdb8a10ba6eee28a024d6d3" }
+segment-anything = { git = "https://github.com/facebookresearch/segment-anything.git" }
+diffusers = { git = "https://github.com/huggingface/diffusers" }
