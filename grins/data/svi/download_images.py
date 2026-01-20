@@ -9,9 +9,9 @@ import numpy as np
 import os
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
+import click
 
-from ...config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, API_KEY
-
+from ...config import PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, API_KEY, SVI_DATA_DIR
 
 
 def get_street_view_image(lat, lon, heading, pitch, fov, filename):
@@ -43,10 +43,21 @@ def get_street_view_image(lat, lon, heading, pitch, fov, filename):
     if response.status_code == 200:
         with open(filename, "wb") as f:
             f.write(response.content)
+    elif response.status_code == 403:
+        logger.error(
+            f"403 Forbidden error for location ({lat}, {lon}) with heading {heading}."
+        )
+        logger.error(f"Response: {response.text}")
+        logger.error("Possible causes:")
+        logger.error("  - API key is invalid or expired")
+        logger.error("  - Street View Static API is not enabled in Google Cloud Console")
+        logger.error("  - Billing is not set up for your Google Cloud project")
+        logger.error("  - API key restrictions are blocking the request")
     else:
-        logger.info(
+        logger.warning(
             f"Failed to download image for location ({lat}, {lon}) with heading {heading}. Error: {response.status_code}"
         )
+        logger.warning(f"Response: {response.text}")
 
 
 def download_images_for_heading(lat, lon, heading, image_path, filename_prefix):
@@ -64,6 +75,11 @@ def download_images_for_heading(lat, lon, heading, image_path, filename_prefix):
     heading_dir.mkdir(parents=True, exist_ok=True)
 
     filename = heading_dir / f"{filename_prefix}_heading_{heading}.jpg"
+
+    # Skip download if image already exists and has content
+    if filename.exists() and filename.stat().st_size > 0:
+        logger.debug(f"Skipping {filename} - already exists")
+        return
 
     get_street_view_image(lat, lon, heading, 0, 90, filename)
 
@@ -132,21 +148,42 @@ def check_and_delete_images(directory_path, target_intensity=227, target_count=2
                 )
 
 
-def main(
-    csv_file_path: Path = EXTERNAL_DATA_DIR / "coordinates_Bari_Italy_spacing.csv",
-    image_path: Path = PROCESSED_DATA_DIR / "svi_Bari_Italy_spacing",
-):
-    image_path.mkdir(parents=True, exist_ok=True)
-
+@click.command()
+@click.option('--location', '-l', required=True, help='Place name (e.g., "Bari, Italy")')
+@click.option('--method', '-m', type=click.Choice(['random', 'spacing']), default='spacing',
+              help='Method used to generate coordinates')
+def main(location, method):
+    """Download street view images for coordinates in a location folder."""
+    
+    # Build paths
+    location_folder_name = location.replace(", ", "_").replace(" ", "_")
+    location_dir = SVI_DATA_DIR / location_folder_name
+    csv_file_path = location_dir / f'coordinates_{method}.csv'
+    image_path = location_dir / "images"
+    
+    # Check if CSV exists
     if not csv_file_path.exists():
         logger.error(f"CSV file not found: {csv_file_path}")
+        logger.error(f"Please run download_coordinates.py first for location: {location}")
         raise FileNotFoundError(f"CSV file not found: {csv_file_path}")
-
+    
+    # Create images directory
+    image_path.mkdir(parents=True, exist_ok=True)
+    
+    click.echo(f"Downloading images for {location}...")
+    click.echo(f"Reading coordinates from: {csv_file_path}")
+    click.echo(f"Saving images to: {image_path}")
+    
+    # Download images
     process_csv_and_download_images(csv_file_path, image_path)
-
+    
+    # Clean up invalid images
+    click.echo("Cleaning up invalid images...")
     subfolders = [f for f in image_path.iterdir() if f.is_dir()]
     with ThreadPoolExecutor() as executor:
         executor.map(check_and_delete_images, subfolders)
+    
+    click.echo("✓ Done!")
 
 
 if __name__ == "__main__":
