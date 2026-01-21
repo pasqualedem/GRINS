@@ -9,7 +9,7 @@ from PIL import Image
 from torchvision.transforms import Compose, PILToTensor
 from transformers import AutoImageProcessor, AutoModel
 
-from grins.config import DATA_DIR, PROCESSED_DATA_DIR, PROJ_ROOT
+from grins.config import DATA_DIR, PROCESSED_DATA_DIR, PROJ_ROOT, SVI_DATA_DIR
 from grins.data.mit_place_pulse.preprocess import RemoveWatermark
 from grins.modeling.regress.dinov3 import DINOv3Linear
 from safetensors.torch import load_file
@@ -21,7 +21,7 @@ TASKS = ["Vivacità", "Bellezza", "Tristezza", "Noia", "Sicurezza", "Ricchezza"]
 st.set_page_config(layout="wide")
 
 # Define the path to the images folder
-IMAGE_FOLDER = PROCESSED_DATA_DIR / "svi_Bari_Italy_spacing" / "0"
+IMAGE_FOLDER = SVI_DATA_DIR / "Bari_Italy" / "images" / "0"
 
 # Init model
 transform = Compose(

@@ -16,7 +16,7 @@ from transformers import (
     SegformerForSemanticSegmentation,
 )
 
-from grins.config import PROCESSED_DATA_DIR
+from grins.config import PROCESSED_DATA_DIR, SVI_DATA_DIR
 
 # ============================================================
 # STREAMLIT CONFIG
@@ -24,11 +24,12 @@ from grins.config import PROCESSED_DATA_DIR
 
 st.set_page_config(layout="wide")
 
-IMAGE_FOLDER = PROCESSED_DATA_DIR / "svi_Bari_Italy_spacing" / "0"
+IMAGE_FOLDER = SVI_DATA_DIR / "Bari_Italy" / "images" / "0"
 
 # ============================================================
 # MODEL LOADERS
 # ============================================================
+
 
 @st.cache_resource
 def load_mask2former():
@@ -53,9 +54,11 @@ def load_segformer():
     model.eval()
     return processor, model
 
+
 # ============================================================
 # IMAGE LOADING
 # ============================================================
+
 
 def load_images(folder):
     images = []
@@ -65,9 +68,11 @@ def load_images(folder):
             images.append({"name": fname, "image": img})
     return images
 
+
 # ============================================================
 # INFERENCE
 # ============================================================
+
 
 def run_instance(image, processor, model):
     inputs = processor(images=image, return_tensors="pt")
@@ -87,9 +92,11 @@ def run_semantic(image, processor, model):
 
     return outputs.logits.argmax(dim=1)[0].cpu().numpy()
 
+
 # ============================================================
 # STATISTICS
 # ============================================================
+
 
 def instance_stats(segmentation, segments_info, id2label):
     h, w = segmentation.shape
@@ -120,9 +127,11 @@ def semantic_stats(segmentation, id2label):
 
     return sorted(stats, key=lambda x: x[2], reverse=True)
 
+
 # ============================================================
 # DYNAMIC COLOR MAPPING (NO FIXED COLORS)
 # ============================================================
+
 
 def segmentation_to_rgb(segmentation):
     unique_ids = np.unique(segmentation)
@@ -141,9 +150,11 @@ def segmentation_to_rgb(segmentation):
 
     return rgb
 
+
 # ============================================================
 # INTERACTIVE STATS PLOT
 # ============================================================
+
 
 def plot_stats(stats):
     df = pd.DataFrame(stats, columns=["ID", "Label", "Percentage"])
@@ -154,10 +165,7 @@ def plot_stats(stats):
     cmap = cm.get_cmap("tab20", len(classes))
 
     # Generiamo la mappa classe -> HEX (Plotly accetta HEX o stringhe RGB)
-    id_to_color = {
-        int(k): to_hex(cmap(i)[:3])
-        for i, k in enumerate(classes)
-    }
+    id_to_color = {int(k): to_hex(cmap(i)[:3]) for i, k in enumerate(classes)}
     df["ID_str"] = df["ID"].astype(str)
 
     fig = px.bar(
@@ -167,9 +175,10 @@ def plot_stats(stats):
         orientation="h",
         text="Percentage",
         color="ID_str",  # this tells Plotly to color bars based on ID
-        color_discrete_map={str(k): v for k, v in id_to_color.items()}  # map as strings
+        color_discrete_map={
+            str(k): v for k, v in id_to_color.items()
+        },  # map as strings
     )
-
 
     fig.update_layout(
         height=500,
@@ -180,9 +189,11 @@ def plot_stats(stats):
     fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
     return fig
 
+
 # ============================================================
 # APP
 # ============================================================
+
 
 def main():
     st.title("Image Segmentation Demo")
