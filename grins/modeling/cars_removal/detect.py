@@ -42,8 +42,8 @@ def annotate(root_dir, device, batch_size):
     """
     root = Path(root_dir)
     images_dir = root / "images"
-    masks_dir = root / "masks"
-    annotation_path = root / "car_annotations.json"
+    masks_dir = root / "car_removal" / "masks"
+    annotation_path = root / "car_removal" / "car_annotations.json"
     processor = Sam3Processor.from_pretrained("facebook/sam3")
     model = Sam3Model.from_pretrained("facebook/sam3").to(device)
     obj_types = ["car", "truck", "bus", "van"]

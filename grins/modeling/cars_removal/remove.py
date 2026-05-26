@@ -59,15 +59,14 @@ def remove_cars(root_dir, output_dir, device, resume):
 	"""
 	root = Path(root_dir)
 	images_dir = root / "images"
-	masks_dir = root / "masks"
-	annotation_path = root / "car_annotations.json"
-	if not annotation_path.exists():
-		raise FileNotFoundError(f"car_annotations.json not found in {root}")
-
-	# Output dirs
 	car_removal_dir = root / "car_removal" if output_dir is None else Path(output_dir)
 	car_removal_dir.mkdir(parents=True, exist_ok=True)
-	removal_ann_path = root / "car_removal_annotations.json"
+	masks_dir = car_removal_dir / "masks"
+	annotation_path = car_removal_dir / "car_annotations.json"
+	if not annotation_path.exists():
+		raise FileNotFoundError(f"car_annotations.json not found in {car_removal_dir}")
+
+	removal_ann_path = car_removal_dir / "car_removal_annotations.json"
 
 	# Load annotations
 	with open(annotation_path, "r") as f:

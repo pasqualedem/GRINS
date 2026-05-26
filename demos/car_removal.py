@@ -15,7 +15,7 @@ def index_dataset(root: Path):
     data = {}
 
     for heading_dir in root.iterdir():
-        if not heading_dir.is_dir():
+        if not heading_dir.is_dir() or not heading_dir.name.isdigit():
             continue
 
         heading = heading_dir.name

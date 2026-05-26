@@ -59,6 +59,26 @@ Then, to inpaint the images and remove the cars, run:
 python -m grins.modeling.cars_removal.remove data/raw/svi/Bari_Italy
 ```
 
+## Segmentation
+
+To run semantic segmentation on the street view images using Mask2Former:
+
+```bash
+python -m grins.data.svi.segment_images \
+  --input-dir data/raw/svi/Bari_Italy/images \
+  --mapping-file data/external/macro_classes/macro_classes_with_colors_new.xlsx \
+  --output-dir data/raw/svi/Bari_Italy/segmentation \
+  --batch-size 8 \
+  --save-images
+```
+
+This produces the following outputs under `data/raw/svi/Bari_Italy/segmentation/`:
+
+- `segmentation_results.json` — COCO-style per-image results: for each image, `height`, `width`, and a list of `segments`, each with `label_id`, `label`, `macro_class`, `area`, and a `segmentation` field containing the binary mask in COCO RLE format (decode with `pycocotools.mask.decode`)
+- `segmentation_stats.csv/xlsx` — pixel counts per image; macro-class columns (prefixed `macro_`) come first in alphabetical order, followed by COCO class columns (prefixed `class_`) also in alphabetical order
+- `segmentation_stats_relative.csv/xlsx` — same structure but counts divided by total pixels per image (values in [0, 1])
+- `annotated_images/<heading>/` — original images blended with a color-coded macro-class overlay (70% mask, 30% original)
+
 ## Run a Training Experiment
 
 To run a training experiment, use the following command:

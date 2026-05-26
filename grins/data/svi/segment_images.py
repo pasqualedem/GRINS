@@ -11,6 +11,7 @@ from PIL import Image
 from collections import defaultdict
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoImageProcessor, Mask2FormerForUniversalSegmentation
+from pycocotools import mask as mask_utils
 from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
@@ -134,43 +135,49 @@ def process_batch(model, processor, batch, device, color_mapping, macro_mapping)
 
     for path, img, mask in zip(paths, images, results):
         mask_np = mask.cpu().numpy()
+        h, w = mask_np.shape
 
-        # --- 1. Compute Statistics ---
         raw_counts = defaultdict(int)
         macro_counts = defaultdict(int)
+        segments = []
 
         unique_labels = np.unique(mask_np)
 
         for label_id in unique_labels:
-            # Get text label from model config (e.g., 0 -> "road")
-            label_text = model.config.id2label.get(label_id, str(label_id))
+            label_text = model.config.id2label.get(int(label_id), str(label_id))
+            binary_mask = (mask_np == label_id)
+            count = int(binary_mask.sum())
 
-            # Count pixels
-            count = int(np.sum(mask_np == label_id))
-
-            # Update Raw counts
             raw_counts[label_text] += count
-
-            # Update Macro counts
             macro_class = macro_mapping.get(label_text, "Unknown")
             macro_counts[macro_class] += count
 
-        # --- 2. Create Blended Image (Optional Visualization) ---
-        # Create a colored mask overlay
+            rle = mask_utils.encode(np.asfortranarray(binary_mask.astype(np.uint8)))
+            rle["counts"] = rle["counts"].decode("utf-8")
+
+            segments.append({
+                "label_id": int(label_id),
+                "label": label_text,
+                "macro_class": macro_class,
+                "area": count,
+                "segmentation": rle,
+            })
+
         output_image_np = np.array(img)
         for label_id in unique_labels:
-            label_text = model.config.id2label.get(label_id, str(label_id))
+            label_text = model.config.id2label.get(int(label_id), str(label_id))
             if label_text in color_mapping:
-                # Apply color to the mask area
                 output_image_np[mask_np == label_id] = color_mapping[label_text]
 
-        # Blend original with mask (alpha 0.7)
         blended = Image.blend(img, Image.fromarray(output_image_np), alpha=0.7)
 
         batch_results.append(
             {
                 "path": path,
                 "blended_image": blended,
+                "height": h,
+                "width": w,
+                "segments": segments,
                 "raw_distribution": dict(raw_counts),
                 "macro_distribution": dict(macro_counts),
             }
@@ -295,35 +302,51 @@ def main(input_dir, mapping_file, output_dir, batch_size, save_images):
                     meta["heading"],
                 )
 
-            # Prepare Record
+            seq_id_int = int(seq_id) if seq_id.isdigit() else -1
+            point_id_int = int(point_id) if point_id.isdigit() else -1
+            heading_int = int(heading) if heading.isdigit() else -1
+
             record = {
-                "seq_id": seq_id,
-                "point_id": point_id,
-                "heading": heading,
+                "seq_id": seq_id_int,
+                "point_id": point_id_int,
+                "heading": heading_int,
                 "filename_relative": str(original_path.relative_to(input_path)),
+                "height": res["height"],
+                "width": res["width"],
+                "segments": res["segments"],
                 "raw_distribution": res["raw_distribution"],
                 "macro_distribution": res["macro_distribution"],
             }
             final_records.append(record)
 
-            # Save Image (Optional)
             if save_images:
-                # Replicate folder structure in output
                 save_dir = output_path / "annotated_images" / heading
                 save_dir.mkdir(parents=True, exist_ok=True)
                 save_path = save_dir / filename
                 res["blended_image"].save(save_path)
 
     # 5. Export Results
+    final_records.sort(key=lambda r: (r["seq_id"], r["point_id"], r["heading"]))
 
-    # A. Save Full JSON (The "Big JSON" to avoid re-running)
+    # A. Save Full JSON (COCO-style segments with RLE masks)
+    json_records = [
+        {
+            "seq_id": r["seq_id"],
+            "point_id": r["point_id"],
+            "heading": r["heading"],
+            "filename_relative": r["filename_relative"],
+            "height": r["height"],
+            "width": r["width"],
+            "segments": r["segments"],
+        }
+        for r in final_records
+    ]
     json_path = output_path / "segmentation_results.json"
     with open(json_path, "w") as f:
-        json.dump(final_records, f, indent=4)
-    click.echo(f"Saved full JSON results to {json_path}")
+        json.dump(json_records, f, indent=2)
+    click.echo(f"Saved COCO-style JSON results to {json_path}")
 
     # B. Save Flattened CSV/Excel
-    # We need to flatten the distribution dictionaries into columns
     flat_data = []
     for r in final_records:
         row = {
@@ -332,31 +355,33 @@ def main(input_dir, mapping_file, output_dir, batch_size, save_images):
             "heading": r["heading"],
             "filename": r["filename_relative"],
         }
-        # Add Macro Columns (prefix with macro_)
         for k, v in r["macro_distribution"].items():
             row[f"macro_{k}"] = v
-
-        # Add Raw Columns (prefix with class_)
         for k, v in r["raw_distribution"].items():
             row[f"class_{k}"] = v
-
         flat_data.append(row)
 
-    df = pd.DataFrame(flat_data)
-
-    # Fill NaNs with 0 (for classes present in some images but not others)
-    df.fillna(0, inplace=True)
-
-    # Sort for tidiness
+    df = pd.DataFrame(flat_data).fillna(0)
     df.sort_values(by=["seq_id", "point_id", "heading"], inplace=True)
 
-    csv_path = output_path / "segmentation_stats.csv"
-    excel_path = output_path / "segmentation_stats.xlsx"
+    info_cols = ["seq_id", "point_id", "heading", "filename"]
+    macro_cols = sorted([c for c in df.columns if c.startswith("macro_")])
+    class_cols = sorted([c for c in df.columns if c.startswith("class_")])
+    df = df[info_cols + macro_cols + class_cols]
 
-    df.to_csv(csv_path, index=False)
-    df.to_excel(excel_path, index=False)
+    df.to_csv(output_path / "segmentation_stats.csv", index=False)
+    df.to_excel(output_path / "segmentation_stats.xlsx", index=False)
+    click.echo(f"Saved pixel counts to segmentation_stats.csv/xlsx")
 
-    click.echo(f"Saved stats to {csv_path} and {excel_path}")
+    # C. Save Relative Stats (pixel counts divided by total pixels per image)
+    total_pixels = df[class_cols].sum(axis=1)
+    df_rel = df[info_cols].copy()
+    for c in macro_cols + class_cols:
+        df_rel[c] = df[c] / total_pixels
+
+    df_rel.to_csv(output_path / "segmentation_stats_relative.csv", index=False)
+    df_rel.to_excel(output_path / "segmentation_stats_relative.xlsx", index=False)
+    click.echo(f"Saved relative stats to segmentation_stats_relative.csv/xlsx")
     click.echo("Done.")
 
 
